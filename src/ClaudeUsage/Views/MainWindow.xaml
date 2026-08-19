@@ -1,0 +1,194 @@
+<Window
+    x:Class="ClaudeUsage.Views.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ClaudeUsage.Views.Controls"
+    xmlns:local="using:ClaudeUsage.ViewModels"
+    mc:Ignorable="d"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <!-- Background left transparent so the Mica backdrop (set in code-behind) shows through. -->
+    <Grid x:Name="RootGrid" Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Custom title bar: draggable region + branding + Settings/Refresh actions. System caption buttons render at the far right automatically. -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="16,0,8,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="0">
+                <TextBlock Text="ClaudeUsage" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                <TextBlock Text="Claude Usage Monitor" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <Button x:Name="RefreshButton" Style="{StaticResource IconButtonStyle}" Click="OnRefreshClicked"
+                        AutomationProperties.Name="Refresh usage data" ToolTipService.ToolTip="Refresh now">
+                    <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                </Button>
+                <Button x:Name="SettingsButton" Style="{StaticResource IconButtonStyle}" Click="OnSettingsClicked"
+                        AutomationProperties.Name="Open settings" ToolTipService.ToolTip="Settings">
+                    <FontIcon Glyph="&#xE713;" FontSize="14" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16,4,16,16">
+            <StackPanel Spacing="14">
+
+                <!-- TODAY'S USAGE -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="TODAY" Style="{StaticResource SectionHeaderStyle}" />
+
+                        <Grid Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Spacing="8">
+                                <controls:SkeletonBlock Height="40" Width="120" HorizontalAlignment="Left" />
+                                <controls:SkeletonBlock Height="10" />
+                                <controls:SkeletonBlock Height="16" Width="200" HorizontalAlignment="Left" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Spacing="12" Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                            <StackPanel Spacing="6">
+                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                    <TextBlock Text="{Binding UsagePercentText}" Style="{StaticResource DisplayTextBlockStyle}" FontSize="34" />
+                                    <TextBlock Text="of daily limit" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+                                </StackPanel>
+                                <ProgressBar
+                                    Style="{StaticResource UsageProgressBarStyle}"
+                                    Minimum="0" Maximum="100"
+                                    Value="{Binding UsagePercent}"
+                                    Foreground="{Binding UsageState, Converter={StaticResource UsageStateToBrushConverter}}"
+                                    AutomationProperties.Name="Usage vs. daily limit" />
+                            </StackPanel>
+
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Requests" Style="{StaticResource MetricLabelStyle}" />
+                                    <TextBlock Text="{Binding RequestsText}" Style="{StaticResource MetricValueStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="Tokens" Style="{StaticResource MetricLabelStyle}" />
+                                    <TextBlock Text="{Binding TokensText}" Style="{StaticResource MetricValueStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="2">
+                                    <TextBlock Text="Cost" Style="{StaticResource MetricLabelStyle}" />
+                                    <TextBlock Text="{Binding CostText}" Style="{StaticResource MetricValueStyle}" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- MODEL USAGE (hidden in Small layout) -->
+                <Border x:Name="ModelUsageCard" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="MODEL USAGE" Style="{StaticResource SectionHeaderStyle}" />
+                        <ItemsControl ItemsSource="{Binding ModelUsages}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:ModelUsageItem">
+                                    <StackPanel Spacing="4" Margin="0,0,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Bind DisplayName}" Style="{StaticResource BodyTextBlockStyle}" />
+                                            <TextBlock Grid.Column="1" Text="{x:Bind SharePercentText}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </Grid>
+                                        <ProgressBar Style="{StaticResource ModelProgressBarStyle}" Minimum="0" Maximum="100" Value="{x:Bind SharePercent}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- USAGE HISTORY (Large layout only) -->
+                <Border x:Name="HistoryCard" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="USAGE HISTORY" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                                <ToggleButton x:Name="Period24h" Content="24H" Style="{StaticResource PeriodToggleStyle}" IsChecked="True" Click="OnPeriodToggleClicked" Tag="Last24Hours" />
+                                <ToggleButton x:Name="Period7d" Content="7D" Style="{StaticResource PeriodToggleStyle}" Click="OnPeriodToggleClicked" Tag="Last7Days" />
+                                <ToggleButton x:Name="Period30d" Content="30D" Style="{StaticResource PeriodToggleStyle}" Click="OnPeriodToggleClicked" Tag="Last30Days" />
+                            </StackPanel>
+                        </Grid>
+                        <controls:HistoryChartControl Height="100" Points="{Binding HistoryPoints}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ESTIMATED COST (hidden in Small layout) -->
+                <Border x:Name="CostCard" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="ESTIMATED COST" Style="{StaticResource SectionHeaderStyle}" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Text="Today" Style="{StaticResource MetricLabelStyle}" />
+                                <TextBlock Text="{Binding CostTodayText}" Style="{StaticResource MetricValueStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Text="This Month" Style="{StaticResource MetricLabelStyle}" />
+                                <TextBlock Text="{Binding CostMonthToDateText}" Style="{StaticResource MetricValueStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="2">
+                                <TextBlock Text="Projected" Style="{StaticResource MetricLabelStyle}" />
+                                <TextBlock Text="{Binding CostProjectedText}" Style="{StaticResource MetricValueStyle}" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{Binding CostChangeText}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- API STATUS -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="{Binding ConnectionState, Converter={StaticResource ConnectionStateToBrushConverter}}" />
+                            <TextBlock Text="{Binding ConnectionStateText}" Style="{StaticResource BodyTextBlockStyle}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding LastUpdatedText}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                        <Border
+                            Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                            CornerRadius="{StaticResource ControlCornerRadiusSmall}"
+                            Padding="12,8"
+                            Visibility="{Binding IsOffline, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE7BA;" FontSize="14" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                    <TextBlock Text="Unable to load usage" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding ErrorMessage, FallbackValue='Check your API key and network connection, or enable Demo Mode in Settings.'}" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}" />
+                                <Button Content="Retry" Click="OnRefreshClicked" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

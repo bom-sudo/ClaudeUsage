@@ -80,6 +80,18 @@ if ($exitCode -ne 0) {
     throw "MSBuild failed with exit code $exitCode."
 }
 
+# MSBuild names the bundle after the version/platform (e.g. ClaudeUsage_1.0.0.0_x64.msixbundle),
+# which changes every release. Copy it to a fixed name too, so downstream tooling — the
+# Install-ClaudeUsage.ps1 recipient script and Build-Installer.ps1 — can reference a stable path.
+$bundle = Get-ChildItem -Path $OutputDirectory -Filter "*.msixbundle" -Recurse |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($bundle) {
+    $stablePath = Join-Path $OutputDirectory "ClaudeUsage.msixbundle"
+    Copy-Item $bundle.FullName $stablePath -Force
+    Write-Host "Also copied to a stable filename: $stablePath"
+}
+
 Write-Host ""
 Write-Host "Package created under: $OutputDirectory" -ForegroundColor Green
-Write-Host "Hand the recipient the .msixbundle (or platform-specific .msix) plus certs/ClaudeUsage.cer, then have them run Install-ClaudeUsage.ps1."
+Write-Host "Hand the recipient the .msixbundle plus certs/ClaudeUsage.cer, then have them run Install-ClaudeUsage.ps1 —"
+Write-Host "or run Build-Installer.ps1 to wrap both into a single ClaudeUsageSetup.exe (requires Inno Setup)."

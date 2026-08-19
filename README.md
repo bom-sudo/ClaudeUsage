@@ -122,9 +122,20 @@ Two equivalent paths — both need Visual Studio 2022 (or the Build Tools for Vi
 ./scripts/Build-MsixPackage.ps1 -Platform x64
 ```
 
-Output lands in `dist/` as a signed `.msixbundle`. Ship it alongside `certs/ClaudeUsage.cer` (the *public* half — never the `.pfx`) — the recipient runs `scripts/Install-ClaudeUsage.ps1 -PackagePath <bundle> -CertificatePath <cer>` to trust the cert and install, no admin rights required. Both scripts' doc comments cover the details (cert trust store, Developer Mode requirement, why the password briefly appears as a process argument). `docs/MANUAL-TH.md` has the full walkthrough with recipient-side instructions in Thai.
+Output lands in `dist/` as a signed `.msixbundle` (plus a stably-named copy, `dist/ClaudeUsage.msixbundle`, regardless of version). Ship it alongside `certs/ClaudeUsage.cer` (the *public* half — never the `.pfx`) — the recipient runs `scripts/Install-ClaudeUsage.ps1 -PackagePath <bundle> -CertificatePath <cer>` to trust the cert and install, no admin rights required. Both scripts' doc comments cover the details (cert trust store, Developer Mode requirement, why the password briefly appears as a process argument). `docs/MANUAL-TH.md` has the full walkthrough with recipient-side instructions in Thai.
 
 The `dotnet publish -p:PublishProfile=win-x64` profiles under `Properties/PublishProfiles/` remain useful for producing a self-contained, ReadyToRun build without packaging (`GenerateAppxPackageOnBuild=false`) — e.g. for local testing of the raw binaries — but they don't produce an installable MSIX; use the packaging path above for that.
+
+### One-file installer (`ClaudeUsageSetup.exe`)
+
+The MSIX/certificate/PowerShell dance above is what makes secure credential storage, toast notifications, and launch-at-startup work correctly — but it's not something to hand an ordinary end user. `installer/ClaudeUsage.iss` (an [Inno Setup](https://jrsoftware.org/isinfo.php) script — free, ~10 MB compiler) wraps the whole thing into a single `.exe`: double-click, click through a normal wizard, done. Under the hood it trusts the certificate, flips the same registry switch as "Developer Mode → Install apps for sideloading", and calls `Add-AppxPackage` — none of which the person installing it ever sees. It also registers a proper uninstaller in *Apps & features* that removes the AppX package.
+
+```powershell
+./scripts/New-PackagingCertificate.ps1        # once
+./scripts/Build-Installer.ps1 -BuildBundle    # builds the MSIX, then compiles the installer
+```
+
+Requires Inno Setup 6 installed on the *build* machine only (`Build-Installer.ps1` looks for `ISCC.exe` under Program Files or on `PATH`). Output: `dist/ClaudeUsageSetup.exe` — that one file is everything you hand to someone else.
 
 ## 6. Known limitations
 
@@ -135,6 +146,7 @@ Being upfront about what wasn't (and couldn't be, in this environment) verified 
 - **Tray icon API surface.** `TrayIconService` uses `H.NotifyIcon.WinUI`'s documented `TaskbarIcon` API (`IconSource`, `ContextFlyout`, `ForceCreate()`); if the installed package version's surface differs slightly, that's the first place to check.
 - **Theme changes apply on Settings close**, not live per-keystroke — flipping Light/Dark takes effect when the Settings window closes (it re-reads the saved settings and applies `ElementTheme` to both windows), not instantly on radio-button click.
 - **MSIX signing scripts are untested end-to-end** (see §5) — `scripts/New-PackagingCertificate.ps1` and `scripts/Build-MsixPackage.ps1` were written correctly against the documented `New-SelfSignedCertificate`/MSBuild packaging properties but not run in this environment (no Visual Studio/MSBuild available); the manifest's `CN=ClaudeUsage` identity is a local/self-signed placeholder either way — fine for sideloading, not for the Microsoft Store.
+- **`installer/ClaudeUsage.iss` is likewise untested** — no Inno Setup compiler was available in this environment either. The script was written carefully against Inno's documented `[Run]`/`[Registry]` syntax (including escaping literal `{ }` in the embedded PowerShell, which Inno's own `{constant}` substitution would otherwise choke on) — but budget a first compile-and-run pass to shake out anything subtle.
 
 ## 7. What's genuinely implemented (not stubbed)
 

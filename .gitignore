@@ -13,4 +13,5 @@ BundleArtifacts/
 *.pfx
 certs/
 dist/
+installer/Output/
 TestResults/
